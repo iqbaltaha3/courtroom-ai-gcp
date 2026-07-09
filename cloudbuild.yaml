@@ -1,0 +1,49 @@
+# cloudbuild.yaml  (place at the REPO ROOT)
+# Triggered automatically by a Cloud Build GitHub trigger on push to `main`.
+# Builds backend/Dockerfile, pushes to Artifact Registry, deploys to Cloud Run.
+
+steps:
+  # 1. Build the image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest"
+      - "./backend"
+
+  # 2. Push both tags
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}"
+
+  # 3. Deploy to Cloud Run
+  - name: "gcr.io/google-cloud-sdk/slim"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE}"
+      - "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}"
+      - "--region=${_REGION}"
+      - "--platform=managed"
+      - "--allow-unauthenticated"
+      - "--memory=1Gi"
+      - "--timeout=3600"
+      - "--set-secrets=GROQ_API_KEY=GROQ_API_KEY:latest,TAVILY_API_KEY=TAVILY_API_KEY:latest,LANGFUSE_PUBLIC_KEY=LANGFUSE_PUBLIC_KEY:latest,LANGFUSE_SECRET_KEY=LANGFUSE_SECRET_KEY:latest"
+      - "--set-env-vars=GROQ_MODEL=openai/gpt-oss-120b,LLM_PROVIDER=groq,LANGFUSE_BASE_URL=https://cloud.langfuse.com"
+
+images:
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}"
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest"
+
+substitutions:
+  _REGION: "us-central1"
+  _REPO: "courtroom-ai"
+  _SERVICE: "courtroom-backend"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
