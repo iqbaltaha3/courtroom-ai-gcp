@@ -1,0 +1,48 @@
+# ============================================================
+# COURTROOM AI - SIMPLE CONFIGURATION (Groq only)
+# ============================================================
+# One model is used for every agent by default (see GROQ_MODEL in .env).
+# Override the "model" field below for any agent if you want a different
+# Groq model for that specific agent — otherwise leave it out.
+# ============================================================
+
+agents:
+  case_manager:
+    call_type: "structured"
+    max_tokens: 2000
+
+  legal_research:
+    call_type: "structured"
+    max_tokens: 2000
+
+  consultant:
+    call_type: "prose"
+    max_tokens: 1500
+
+  top_consultant:
+    call_type: "prose"
+    max_tokens: 2000
+
+  prosecutor_r1:
+    call_type: "prose"
+    max_tokens: 1500
+
+  prosecutor_r2:
+    call_type: "prose"
+    max_tokens: 1500
+
+  defense_r1:
+    call_type: "prose"
+    max_tokens: 1500
+
+  defense_r2:
+    call_type: "prose"
+    max_tokens: 1500
+
+  judge:
+    call_type: "structured"
+    max_tokens: 2000
+
+  reporter:
+    call_type: "prose"
+    max_tokens: 1500

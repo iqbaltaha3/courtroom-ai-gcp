@@ -1,0 +1,19 @@
+# LLM & Graph Orchestration
+langgraph>=0.2.0
+groq>=0.4.0
+pydantic>=2.0
+
+# Observability
+langfuse>=3.0.0
+
+# Configuration
+python-dotenv>=1.0.0
+pyyaml>=6.0
+
+# Web Search (used by the legal research agent)
+tavily-python>=0.3.0
+
+# Backend server
+fastapi>=0.111.0
+uvicorn>=0.30.0
+sse-starlette>=2.1.0
