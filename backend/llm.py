@@ -6,9 +6,12 @@ For testing without any LLM, set MOCK_LLM=true.
 
 import json
 import os
+import re
+import time
 from typing import Type, TypeVar, Any, Dict
 
 from openai import OpenAI
+from openai import BadRequestError
 from pydantic import BaseModel
 from langfuse import observe, get_client
 
@@ -151,7 +154,7 @@ def call_structured(
     agent_name: str = None,
     max_tokens: int = 2000,
 ) -> T:
-    """Call the selected LLM for structured JSON output."""
+    """Call the selected LLM for structured JSON output with retry on validation failure."""
     if MOCK_LLM:
         dummy_data = _dummy_structured_data(schema)
         return schema(**dummy_data)
@@ -163,44 +166,86 @@ def call_structured(
     langfuse = get_client()
     langfuse.update_current_generation(model=model, metadata={"agent": agent_name, "provider": PROVIDER})
 
-    # Build schema description
+    # Build schema description (used in system prompt)
     pydantic_schema = schema.model_json_schema()
     schema_json = json.dumps(pydantic_schema, indent=2)
 
-    system_with_schema = (
+    base_system = (
         f"{system}\n\n"
         f"You MUST respond with a single JSON object that exactly matches the schema below.\n"
         f"Return ONLY the JSON object, no other text, no markdown, no explanation.\n\n"
         f"Schema:\n{schema_json}"
     )
 
-    extra_kwargs = {}
-    if PROVIDER == "groq":
-        extra_kwargs["response_format"] = {"type": "json_object"}
+    # Retry logic
+    max_retries = 3
+    last_exception = None
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_with_schema},
-            {"role": "user", "content": user},
-        ],
-        max_tokens=max_tokens,
-        temperature=0.3,
-        **extra_kwargs
-    )
+    for attempt in range(max_retries):
+        try:
+            # Add a reminder to be extra strict on retries
+            system_prompt = base_system
+            user_prompt = user
+            if attempt > 0:
+                system_prompt += "\n\nIMPORTANT: Your previous response was not valid JSON. Ensure your output is a single, valid JSON object with no extra text."
+                user_prompt += "\n\nPlease respond with valid JSON only."
 
-    response_text = response.choices[0].message.content
+            extra_kwargs = {}
+            if PROVIDER == "groq":
+                extra_kwargs["response_format"] = {"type": "json_object"}
 
-    # Clean up markdown fences if present
-    if response_text.startswith("```json"):
-        response_text = response_text[7:]
-    if response_text.endswith("```"):
-        response_text = response_text[:-3]
-    response_text = response_text.strip()
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.3,
+                **extra_kwargs
+            )
 
-    try:
-        response_json = json.loads(response_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse JSON response: {e}\nResponse: {response_text}")
+            response_text = response.choices[0].message.content
 
-    return schema(**response_json)
+            # 1. Clean markdown fences
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            # 2. If still not valid, try to extract JSON with regex
+            if not response_text.startswith('{'):
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(0)
+                else:
+                    raise ValueError("No JSON object found in response.")
+
+            response_json = json.loads(response_text)
+            return schema(**response_json)
+
+        except BadRequestError as e:
+            # If the API says JSON validation failed, retry
+            if e.code == 'json_validate_failed' and attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # exponential backoff
+                last_exception = e
+                continue
+            else:
+                raise
+        except (json.JSONDecodeError, ValueError) as e:
+            # If parsing failed, retry (unless it's the last attempt)
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                last_exception = e
+                continue
+            else:
+                raise ValueError(f"Failed to parse JSON after {max_retries} attempts: {e}") from e
+        except Exception as e:
+            # Any other error, propagate immediately
+            raise
+
+    # If we exhausted retries, raise the last exception
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("Unexpected failure in call_structured")
