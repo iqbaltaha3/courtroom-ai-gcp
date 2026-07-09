@@ -10,39 +10,49 @@ agents:
   case_manager:
     call_type: "structured"
     max_tokens: 2000
+    model: "openai/gpt-oss-120b"          # For reliable JSON output
 
   legal_research:
     call_type: "structured"
     max_tokens: 2000
+    model: "openai/gpt-oss-120b"
 
   consultant:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"      # High TPM limit
 
   top_consultant:
     call_type: "prose"
     max_tokens: 2000
+    model: "llama-3.3-70b-versatile"
 
   prosecutor_r1:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"
 
   prosecutor_r2:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"
 
   defense_r1:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"
 
   defense_r2:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"
 
   judge:
     call_type: "structured"
     max_tokens: 2000
+    model: "openai/gpt-oss-120b"
 
   reporter:
     call_type: "prose"
     max_tokens: 1500
+    model: "llama-3.3-70b-versatile"
