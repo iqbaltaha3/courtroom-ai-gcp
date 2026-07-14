@@ -147,3 +147,9 @@ Some AI systems let the model freely decide what to do next at every step. This 
 - Not a source of actual legal advice — always consult a real lawyer for real legal matters
 - Not a database of guaranteed-accurate case law — the "Legal Research" agent does live web searches, but its findings should be verified independently
 - Not a predictor of real court outcomes — it's a structured simulation meant to illustrate how legal reasoning chains together, not a forecasting tool
+
+## License
+
+This project is licensed under the Apache License 2.0.
+
+If you use or redistribute this project, you must preserve the copyright notice and license, and indicate any modifications made.
